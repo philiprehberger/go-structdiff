@@ -4,7 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/philiprehberger/go-structdiff.svg)](https://pkg.go.dev/github.com/philiprehberger/go-structdiff)
 [![License](https://img.shields.io/github/license/philiprehberger/go-structdiff)](LICENSE)
 
-Field-level struct comparison for Go. Compare two structs and get a list of changes with dot-notation paths, powered by reflection. Zero external dependencies.
+Field-level struct comparison for Go with dot-notation change paths and zero dependencies
 
 ## Installation
 
