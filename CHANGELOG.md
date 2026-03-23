@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Fix README structure: remove extra Features section
+
 ## 0.2.0
 
 - Add `Patch` function to apply changes to a struct pointer via dot-notation paths

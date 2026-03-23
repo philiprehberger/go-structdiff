@@ -134,17 +134,6 @@ if structdiff.Equal(a, b) {
 | `Change{Path, Old, New}` | Represents a single field difference |
 | `Change.String() string` | Human-readable format: `"Path: old → new"` |
 
-## Features
-
-- All primitive types, strings, slices, maps, nested structs, pointers
-- Dot-notation paths: `"Address.City"`, `"Items[2].Name"`
-- Patch structs by applying change sets
-- Formatted output (human-readable and JSON)
-- Field filtering with `OnlyFields` and `Ignore` options
-- Handles nil pointers and type mismatches
-- Skips unexported fields automatically
-- Zero external dependencies
-
 ## Development
 
 ```bash
