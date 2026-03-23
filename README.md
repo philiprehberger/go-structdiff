@@ -69,6 +69,48 @@ changes := structdiff.Compare(a, b, structdiff.IgnoreTag("diff"))
 // Only returns Name change; Internal is skipped
 ```
 
+### Only compare specific fields
+
+```go
+changes := structdiff.Compare(a, b, structdiff.OnlyFields("Name", "Age"))
+// Only compares Name and Age, ignores all other fields
+```
+
+### Patching
+
+```go
+p := Person{Name: "Alice", Age: 30}
+changes := structdiff.Compare(p, Person{Name: "Bob", Age: 31})
+
+err := structdiff.Patch(&p, changes)
+// p is now {Name: "Bob", Age: 31}
+```
+
+Patch supports nested struct fields via dot-notation paths:
+
+```go
+p := Person{Name: "Alice", Address: Address{City: "NY"}}
+err := structdiff.Patch(&p, []structdiff.Change{
+    {Path: "Address.City", New: "LA"},
+})
+// p.Address.City is now "LA"
+```
+
+### Formatted output
+
+```go
+changes := structdiff.Compare(a, b)
+
+// Human-readable
+fmt.Println(structdiff.Format(changes))
+// Name: "Alice" → "Bob"
+// Age: 30 → 31
+
+// JSON
+data, err := structdiff.FormatJSON(changes)
+// [{"path":"Name","old":"Alice","new":"Bob"},{"path":"Age","old":30,"new":31}]
+```
+
 ### Check equality
 
 ```go
@@ -83,8 +125,12 @@ if structdiff.Equal(a, b) {
 |---|---|
 | `Compare(a, b any, opts ...Option) []Change` | Deep compare two structs, returns list of field-level changes |
 | `Equal(a, b any, opts ...Option) bool` | Returns true if structs are deeply equal |
+| `Patch(target any, changes []Change) error` | Apply changes to a struct pointer by setting fields at each path |
+| `Format(changes []Change) string` | Human-readable multi-line diff output with quoted strings |
+| `FormatJSON(changes []Change) ([]byte, error)` | JSON array of `{path, old, new}` objects |
 | `Ignore(fields ...string) Option` | Skip fields by name |
 | `IgnoreTag(tag string) Option` | Skip fields with a specific struct tag value (e.g., `diff:"-"`) |
+| `OnlyFields(fields ...string) Option` | Restrict comparison to only the specified fields |
 | `Change{Path, Old, New}` | Represents a single field difference |
 | `Change.String() string` | Human-readable format: `"Path: old → new"` |
 
@@ -92,6 +138,9 @@ if structdiff.Equal(a, b) {
 
 - All primitive types, strings, slices, maps, nested structs, pointers
 - Dot-notation paths: `"Address.City"`, `"Items[2].Name"`
+- Patch structs by applying change sets
+- Formatted output (human-readable and JSON)
+- Field filtering with `OnlyFields` and `Ignore` options
 - Handles nil pointers and type mismatches
 - Skips unexported fields automatically
 - Zero external dependencies

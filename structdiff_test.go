@@ -1,6 +1,8 @@
 package structdiff
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -408,5 +410,366 @@ func TestFloatFields(t *testing.T) {
 	}
 	if changes[0].Path != "Value" {
 		t.Errorf("expected path Value, got %s", changes[0].Path)
+	}
+}
+
+// --- Patch tests ---
+
+func TestPatchSimple(t *testing.T) {
+	p := Person{Name: "Alice", Age: 30}
+	changes := []Change{
+		{Path: "Name", Old: "Alice", New: "Bob"},
+		{Path: "Age", Old: 30, New: 31},
+	}
+
+	err := Patch(&p, changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Name != "Bob" {
+		t.Errorf("expected Name=Bob, got %s", p.Name)
+	}
+	if p.Age != 31 {
+		t.Errorf("expected Age=31, got %d", p.Age)
+	}
+}
+
+func TestPatchNested(t *testing.T) {
+	p := Person{Name: "Alice", Age: 30, Address: Address{Street: "Main St", City: "NY", Zip: "10001"}}
+	changes := []Change{
+		{Path: "Address.City", Old: "NY", New: "LA"},
+	}
+
+	err := Patch(&p, changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Address.City != "LA" {
+		t.Errorf("expected Address.City=LA, got %s", p.Address.City)
+	}
+}
+
+func TestPatchFieldNotFound(t *testing.T) {
+	p := Person{Name: "Alice"}
+	changes := []Change{
+		{Path: "NonExistent", Old: nil, New: "value"},
+	}
+
+	err := Patch(&p, changes)
+	if err == nil {
+		t.Fatal("expected error for non-existent field")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+func TestPatchNonPointer(t *testing.T) {
+	p := Person{Name: "Alice"}
+	err := Patch(p, nil)
+	if err == nil {
+		t.Fatal("expected error for non-pointer target")
+	}
+}
+
+func TestPatchNilPointer(t *testing.T) {
+	var p *Person
+	err := Patch(p, nil)
+	if err == nil {
+		t.Fatal("expected error for nil pointer target")
+	}
+}
+
+func TestPatchEmptyChanges(t *testing.T) {
+	p := Person{Name: "Alice", Age: 30}
+	err := Patch(&p, []Change{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Name != "Alice" || p.Age != 30 {
+		t.Error("struct should not change with empty changes")
+	}
+}
+
+func TestPatchNilChanges(t *testing.T) {
+	p := Person{Name: "Alice"}
+	err := Patch(&p, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// --- Format tests ---
+
+func TestFormatSimple(t *testing.T) {
+	changes := []Change{
+		{Path: "Name", Old: "Alice", New: "Bob"},
+		{Path: "Age", Old: 30, New: 31},
+	}
+
+	result := Format(changes)
+	if !strings.Contains(result, "Name:") {
+		t.Errorf("expected Name in output, got: %s", result)
+	}
+	if !strings.Contains(result, "Age:") {
+		t.Errorf("expected Age in output, got: %s", result)
+	}
+	// String values should be quoted.
+	if !strings.Contains(result, `"Alice"`) {
+		t.Errorf("expected quoted Alice in output, got: %s", result)
+	}
+	if !strings.Contains(result, `"Bob"`) {
+		t.Errorf("expected quoted Bob in output, got: %s", result)
+	}
+}
+
+func TestFormatEmpty(t *testing.T) {
+	result := Format(nil)
+	if result != "" {
+		t.Errorf("expected empty string for nil changes, got: %q", result)
+	}
+
+	result = Format([]Change{})
+	if result != "" {
+		t.Errorf("expected empty string for empty changes, got: %q", result)
+	}
+}
+
+func TestFormatNilValues(t *testing.T) {
+	changes := []Change{
+		{Path: "Value", Old: nil, New: 42},
+	}
+
+	result := Format(changes)
+	if !strings.Contains(result, "<nil>") {
+		t.Errorf("expected <nil> in output, got: %s", result)
+	}
+}
+
+func TestFormatMultiLine(t *testing.T) {
+	changes := []Change{
+		{Path: "A", Old: 1, New: 2},
+		{Path: "B", Old: 3, New: 4},
+	}
+
+	result := Format(changes)
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected 2 lines, got %d: %q", len(lines), result)
+	}
+}
+
+// --- FormatJSON tests ---
+
+func TestFormatJSONSimple(t *testing.T) {
+	changes := []Change{
+		{Path: "Name", Old: "Alice", New: "Bob"},
+		{Path: "Age", Old: 30, New: 31},
+	}
+
+	data, err := FormatJSON(changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result []map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(result))
+	}
+	if result[0]["path"] != "Name" {
+		t.Errorf("expected path=Name, got %v", result[0]["path"])
+	}
+	if result[0]["old"] != "Alice" {
+		t.Errorf("expected old=Alice, got %v", result[0]["old"])
+	}
+	if result[0]["new"] != "Bob" {
+		t.Errorf("expected new=Bob, got %v", result[0]["new"])
+	}
+}
+
+func TestFormatJSONEmpty(t *testing.T) {
+	data, err := FormatJSON(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result []map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("expected empty array, got %d entries", len(result))
+	}
+}
+
+func TestFormatJSONNilValues(t *testing.T) {
+	changes := []Change{
+		{Path: "Value", Old: nil, New: 42},
+	}
+
+	data, err := FormatJSON(changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var result []map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if result[0]["old"] != nil {
+		t.Errorf("expected old=nil, got %v", result[0]["old"])
+	}
+}
+
+// --- OnlyFields tests ---
+
+func TestOnlyFields(t *testing.T) {
+	a := Person{Name: "Alice", Age: 30, Address: Address{City: "NY"}}
+	b := Person{Name: "Bob", Age: 25, Address: Address{City: "LA"}}
+
+	changes := Compare(a, b, OnlyFields("Name"))
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Name" {
+		t.Errorf("expected path Name, got %s", changes[0].Path)
+	}
+}
+
+func TestOnlyFieldsMultiple(t *testing.T) {
+	a := Person{Name: "Alice", Age: 30, Address: Address{City: "NY"}}
+	b := Person{Name: "Bob", Age: 25, Address: Address{City: "LA"}}
+
+	changes := Compare(a, b, OnlyFields("Name", "Age"))
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes, got %d: %v", len(changes), changes)
+	}
+
+	paths := map[string]bool{}
+	for _, c := range changes {
+		paths[c.Path] = true
+	}
+	if !paths["Name"] || !paths["Age"] {
+		t.Error("expected Name and Age changes")
+	}
+}
+
+func TestOnlyFieldsNoMatch(t *testing.T) {
+	a := Person{Name: "Alice", Age: 30}
+	b := Person{Name: "Bob", Age: 25}
+
+	changes := Compare(a, b, OnlyFields("Address"))
+	if changes != nil {
+		t.Errorf("expected nil changes when only comparing unchanged fields, got %v", changes)
+	}
+}
+
+func TestOnlyFieldsWithNested(t *testing.T) {
+	a := Person{Name: "Alice", Age: 30, Address: Address{City: "NY"}}
+	b := Person{Name: "Bob", Age: 25, Address: Address{City: "LA"}}
+
+	changes := Compare(a, b, OnlyFields("Address"))
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Address.City" {
+		t.Errorf("expected path Address.City, got %s", changes[0].Path)
+	}
+}
+
+// --- Map comparison with map[string]any ---
+
+func TestMapStringAnyComparison(t *testing.T) {
+	type Container struct {
+		Meta map[string]any
+	}
+
+	a := Container{Meta: map[string]any{"name": "Alice", "score": 100}}
+	b := Container{Meta: map[string]any{"name": "Bob", "score": 100}}
+
+	changes := Compare(a, b)
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Meta[name]" {
+		t.Errorf("expected path Meta[name], got %s", changes[0].Path)
+	}
+}
+
+func TestMapStringAnyNewKey(t *testing.T) {
+	type Container struct {
+		Meta map[string]any
+	}
+
+	a := Container{Meta: map[string]any{"name": "Alice"}}
+	b := Container{Meta: map[string]any{"name": "Alice", "age": 30}}
+
+	changes := Compare(a, b)
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Meta[age]" {
+		t.Errorf("expected path Meta[age], got %s", changes[0].Path)
+	}
+}
+
+func TestMapStringAnyRemovedKey(t *testing.T) {
+	type Container struct {
+		Meta map[string]any
+	}
+
+	a := Container{Meta: map[string]any{"name": "Alice", "age": 30}}
+	b := Container{Meta: map[string]any{"name": "Alice"}}
+
+	changes := Compare(a, b)
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Meta[age]" {
+		t.Errorf("expected path Meta[age], got %s", changes[0].Path)
+	}
+	if changes[0].New != nil {
+		t.Errorf("expected new=nil for removed key, got %v", changes[0].New)
+	}
+}
+
+func TestMapStringAnyNestedMap(t *testing.T) {
+	type Container struct {
+		Meta map[string]any
+	}
+
+	a := Container{Meta: map[string]any{
+		"nested": map[string]any{"key": "val1"},
+	}}
+	b := Container{Meta: map[string]any{
+		"nested": map[string]any{"key": "val2"},
+	}}
+
+	changes := Compare(a, b)
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d: %v", len(changes), changes)
+	}
+	if changes[0].Path != "Meta[nested][key]" {
+		t.Errorf("expected path Meta[nested][key], got %s", changes[0].Path)
+	}
+}
+
+// --- Patch roundtrip test ---
+
+func TestPatchRoundtrip(t *testing.T) {
+	a := Person{Name: "Alice", Age: 30, Address: Address{Street: "Main St", City: "NY", Zip: "10001"}}
+	b := Person{Name: "Bob", Age: 31, Address: Address{Street: "Main St", City: "LA", Zip: "90001"}}
+
+	changes := Compare(a, b)
+	err := Patch(&a, changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !Equal(a, b) {
+		t.Errorf("after patching, a should equal b. a=%+v b=%+v", a, b)
 	}
 }
