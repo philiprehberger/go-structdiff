@@ -1,6 +1,6 @@
 # go-structdiff
 
-[![CI](https://github.com/philiprehberger/go-structdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/go-structdiff/actions/workflows/ci.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/philiprehberger/go-structdiff.svg)](https://pkg.go.dev/github.com/philiprehberger/go-structdiff) [![License](https://img.shields.io/github/license/philiprehberger/go-structdiff)](LICENSE)
+[![CI](https://github.com/philiprehberger/go-structdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/go-structdiff/actions/workflows/ci.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/philiprehberger/go-structdiff.svg)](https://pkg.go.dev/github.com/philiprehberger/go-structdiff) [![License](https://img.shields.io/github/license/philiprehberger/go-structdiff)](LICENSE) [![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Field-level struct comparison for Go with dot-notation change paths and zero dependencies
 
